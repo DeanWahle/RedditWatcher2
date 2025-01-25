@@ -1,9 +1,9 @@
 import os
 import time
+from datetime import datetime, timedelta
 import praw
 import smtplib
 import logging
-import redis
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
 
@@ -18,8 +18,7 @@ logger.info("Environment variables loaded")
 
 required_vars = [
     'REDDIT_CLIENT_ID', 'REDDIT_CLIENT_SECRET',
-    'EMAIL_FROM', 'EMAIL_TO', 'EMAIL_USERNAME', 'EMAIL_PASSWORD',
-    'REDIS_URL'  # Add this to your .env
+    'EMAIL_FROM', 'EMAIL_TO', 'EMAIL_USERNAME', 'EMAIL_PASSWORD'
 ]
 
 for var in required_vars:
@@ -28,12 +27,6 @@ for var in required_vars:
     else:
         logger.debug(f"Found {var}: {os.getenv(var)[:3]}{'*' * 10}")
 
-# Redis setup
-redis_url = os.getenv('UPSTASH_REDIS', 'redis://localhost:6379')
-redis_client = redis.from_url(redis_url)
-CACHE_EXPIRY = 86400  # 24 hours in seconds
-
-# Reddit API setup
 try:
     reddit = praw.Reddit(
         client_id=os.getenv('REDDIT_CLIENT_ID'),
@@ -86,16 +79,38 @@ def send_notification(title, url):
     )
 
 
-def check_subreddit(subreddit_name):
+class PostCache:
+    def __init__(self, max_age_minutes=60):
+        self.cache = {}  # {post_id: timestamp}
+        self.max_age = timedelta(minutes=max_age_minutes)
+
+    def add(self, post_id):
+        self.cache[post_id] = datetime.now()
+        self._cleanup()
+
+    def __contains__(self, post_id):
+        return post_id in self.cache
+
+    def _cleanup(self):
+        current_time = datetime.now()
+        self.cache = {
+            post_id: timestamp
+            for post_id, timestamp in self.cache.items()
+            if current_time - timestamp <= self.max_age
+        }
+        logger.debug(f"Cache size after cleanup: {len(self.cache)}")
+
+
+def check_subreddit(subreddit_name, post_cache):
     logger.info(f"Checking subreddit: {subreddit_name}")
     try:
         subreddit = reddit.subreddit(subreddit_name)
         for post in subreddit.new(limit=10):
             title_lower = post.title.lower()
-            if ("ipad" in title_lower or "ipad pro" in title_lower) and not redis_client.get(post.id):
+            if ("ipad" in title_lower or "ipad pro" in title_lower) and post.id not in post_cache:
                 logger.info(f"Found new matching post: {post.title}")
                 send_notification(post.title, post.url)
-                redis_client.set(post.id, 'seen', ex=CACHE_EXPIRY)
+                post_cache.add(post.id)
     except Exception as e:
         logger.error(f"Error checking subreddit {subreddit_name}: {e}")
         raise
@@ -103,11 +118,12 @@ def check_subreddit(subreddit_name):
 
 def main():
     logger.info("Starting Reddit monitor")
+    post_cache = PostCache()
 
     while True:
         try:
             for subreddit in ['appleswap', 'hardwareswap']:
-                check_subreddit(subreddit)
+                check_subreddit(subreddit, post_cache)
             logger.debug("Waiting 5 minutes before next check")
             time.sleep(300)
         except Exception as e:
