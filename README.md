@@ -1,6 +1,7 @@
-# Reddit iPad Monitor
+# Buy/Sell/Trade Subreddit Monitor
 
-Monitors r/appleswap and r/hardwareswap for iPad sales posts and sends email notifications.
+The current version of this script monitors the r/appleswap and r/hardwareswap subreddits for posts selling iPads, and sends email notifications with links to these posts when they are found. 
+You could update this script to monitor whatever subreddits you want for whatever keywords you are interested in. 
 
 ## Features
 - Monitors specified subreddits for iPad listings
