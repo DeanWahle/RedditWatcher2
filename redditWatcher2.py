@@ -30,8 +30,7 @@ for var in required_vars:
 
 # Redis setup
 redis_url = os.getenv('UPSTASH_REDIS', 'redis://localhost:6379')
-# SSL settings for Heroku Redis
-redis_client = redis.from_url(redis_url, ssl_cert_reqs=None)
+redis_client = redis.from_url(redis_url)
 CACHE_EXPIRY = 86400  # 24 hours in seconds
 
 # Reddit API setup
