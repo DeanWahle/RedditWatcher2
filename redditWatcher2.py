@@ -19,7 +19,7 @@ logger.info("Environment variables loaded")
 required_vars = [
     'REDDIT_CLIENT_ID', 'REDDIT_CLIENT_SECRET',
     'EMAIL_FROM', 'EMAIL_TO', 'EMAIL_USERNAME', 'EMAIL_PASSWORD',
-    'REDIS_URL'
+    'REDIS_URL'  # Add this to your .env
 ]
 
 for var in required_vars:
@@ -29,7 +29,7 @@ for var in required_vars:
         logger.debug(f"Found {var}: {os.getenv(var)[:3]}{'*' * 10}")
 
 # Redis setup
-redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+redis_url = os.getenv('UPSTASH_REDIS', 'redis://localhost:6379')
 # SSL settings for Heroku Redis
 redis_client = redis.from_url(redis_url, ssl_cert_reqs=None)
 CACHE_EXPIRY = 86400  # 24 hours in seconds
