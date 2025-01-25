@@ -107,7 +107,24 @@ def check_subreddit(subreddit_name, post_cache):
         subreddit = reddit.subreddit(subreddit_name)
         for post in subreddit.new(limit=10):
             title_lower = post.title.lower()
-            if ("ipad" in title_lower or "ipad pro" in title_lower) and post.id not in post_cache:
+
+            # Find positions of [H] and [W] tags
+            h_pos = title_lower.find('[h]')
+            w_pos = title_lower.find('[w]')
+
+            # If [H] isn't found, skip
+            if h_pos == -1:
+                continue
+
+            # Extract the "have" section
+            have_section = ""
+            if h_pos < w_pos or w_pos == -1:  # [H] comes first or no [W]
+                have_section = title_lower[h_pos:w_pos if w_pos != -1 else None]
+            else:  # [W] comes first
+                have_section = title_lower[h_pos:]
+
+            # Check if iPad is in the "have" section
+            if ("ipad" in have_section or "ipad pro" in have_section) and post.id not in post_cache:
                 logger.info(f"Found new matching post: {post.title}")
                 send_notification(post.title, post.url)
                 post_cache.add(post.id)
