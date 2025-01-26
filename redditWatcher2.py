@@ -93,11 +93,14 @@ class PostCache:
 
     def _cleanup(self):
         current_time = datetime.now()
-        self.cache = {
-            post_id: timestamp
-            for post_id, timestamp in self.cache.items()
-            if current_time - timestamp <= self.max_age
-        }
+        expired_posts = []
+        for post_id, timestamp in self.cache.items():
+            if current_time - timestamp > self.max_age:
+                expired_posts.append(post_id)
+
+        for post_id in expired_posts:
+            del self.cache[post_id]
+
         logger.debug(f"Cache size after cleanup: {len(self.cache)}")
 
 
@@ -106,11 +109,17 @@ def check_subreddit(subreddit_name, post_cache):
     try:
         subreddit = reddit.subreddit(subreddit_name)
         for post in subreddit.new(limit=10):
-            title_lower = post.title.lower()
+            # Skip if we've already seen this post
+            if post.id in post_cache:
+                logger.debug(f"Skipping already seen post: {post.title}")
+                continue
 
-            # Find positions of [H] and [W] tags
+            title_lower = post.title.lower()
             h_pos = title_lower.find('[h]')
             w_pos = title_lower.find('[w]')
+
+            # Always add to cache even if not relevant
+            post_cache.add(post.id)
 
             # If [H] isn't found, skip
             if h_pos == -1:
@@ -124,10 +133,10 @@ def check_subreddit(subreddit_name, post_cache):
                 have_section = title_lower[h_pos:]
 
             # Check if iPad is in the "have" section
-            if ("ipad" in have_section or "ipad pro" in have_section) and post.id not in post_cache:
+            if "ipad" in have_section or "ipad pro" in have_section:
                 logger.info(f"Found new matching post: {post.title}")
                 send_notification(post.title, post.url)
-                post_cache.add(post.id)
+
     except Exception as e:
         logger.error(f"Error checking subreddit {subreddit_name}: {e}")
         raise
